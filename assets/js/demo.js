@@ -155,6 +155,23 @@
     }
   }
 
+  // ---- back to top: shown once the first screen is scrolled away
+  {
+    const top = document.querySelector('[data-top]');
+    if (top) {
+      let queued = false;
+      const update = () => {
+        queued = false;
+        const show = scrollY > innerHeight * 0.8;
+        top.classList.toggle('is-shown', show);
+        top.tabIndex = show ? 0 : -1;
+      };
+      addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
+      update();
+      top.addEventListener('click', () => scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }));
+    }
+  }
+
   // ---- phones: a download bar stays at the bottom while neither the hero nor the closing badge is on screen
   {
     const bar = document.querySelector('[data-sticky]');

@@ -251,6 +251,13 @@ button { font: inherit; color: inherit; }
 /* phones: download bar once the hero is out of view */
 .sticky-cta { display: none; }
 
+/* back to top: fades in once the first screen is scrolled away, out again near the top */
+.to-top { position: fixed; right: 24px; bottom: 24px; z-index: 6; display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%;
+          background: var(--white); color: var(--ink); box-shadow: 0 8px 24px rgba(25, 31, 40, 0.22); cursor: pointer;
+          opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s, visibility 0.2s, bottom 0.2s; }
+.to-top.is-shown { opacity: 1; visibility: visible; transform: none; }
+.to-top svg { width: 22px; height: 22px; }
+
 /* footer */
 .site-foot { padding-block: 48px 64px; font-size: 15px; color: var(--slate); }
 .foot-grid { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 28px; }
@@ -280,6 +287,8 @@ button { font: inherit; color: inherit; }
   .sticky-cta p { font-weight: 700; font-size: 15px; }
   .sticky-cta a { background: var(--blue); color: var(--white); font-weight: 700; font-size: 15px; text-decoration: none; padding: 11px 16px; border-radius: 12px; white-space: nowrap; }
   .site-foot { padding-bottom: 120px; }
+  .to-top { right: 12px; bottom: 12px; width: 44px; height: 44px; }
+  .sticky-cta:not([hidden]) ~ .to-top { bottom: 88px; }      /* sits above the download bar */
   .intro { padding-block: 88px; }
   .split + .split { margin-top: 76px; }
   .steps { grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 40px; }
@@ -345,5 +354,6 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .caret, .pointer, .pt-target, .finger, .air-phone, .feed-track { animation: none !important; }
+  .to-top { transition: none; }
   .faq summary::after { transition: none; }
 }
