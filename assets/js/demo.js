@@ -128,22 +128,29 @@
     }
   }
 
-  // ---- the intro reel plays muted on its own (still for reduced motion); one tap on the video or 소리 turns the sound on and off
+  // ---- the intro reel plays muted on its own (still for reduced motion); a tap on the video plays or pauses it,
+  // the 소리 button turns the sound on and off
   {
     const video = document.querySelector('.hero-video video');
     const button = document.querySelector('[data-sound]');
     if (video) {
+      const box = video.parentElement;
+      const mark = () => box.classList.toggle('is-paused', video.paused);
+      video.addEventListener('play', mark);
+      video.addEventListener('pause', mark);
       if (reduced) { video.removeAttribute('autoplay'); video.pause(); }
+      mark();
+      const playPause = () => (video.paused ? video.play() : video.pause());
+      video.addEventListener('click', playPause);
+      video.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); playPause(); } });
       if (button) {
         const label = button.querySelector('[data-sound-label]');
         const toggle = () => {
           video.muted = !video.muted;
-          if (!video.muted && video.paused) video.play();
           button.setAttribute('aria-pressed', String(!video.muted));
           label.textContent = video.muted ? '소리 꺼짐' : '소리 켜짐';
         };
         button.addEventListener('click', toggle);
-        video.addEventListener('click', toggle);
       }
     }
   }
