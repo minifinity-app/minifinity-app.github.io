@@ -1,92 +1,164 @@
-// Side-by-side comparison under ㅎ → 하 → 한: both phones type the same word one key at a time.
-// The left screen only gets it when 전송 is pressed; the right screen composes along with every key, the way the app sends it.
+// Moving pictures on the page: the side-by-side clips play like short GIFs while they are on screen,
+// plus the reel's sound button and the phone download bar.
 (() => {
-  const root = document.querySelector('[data-versus]');
-  if (!root) return;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // run a looping clip only while it is on screen, from the start each time it comes into view
+  const whileVisible = (el, start, stop) => {
+    if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => (e.isIntersecting ? start() : stop()), { threshold: 0.15 }).observe(el);
+    else start();
+  };
+  const loop = (el, cycle, reset) => {
+    let timer = 0, running = false;
+    const later = (f, ms) => { if (running) timer = setTimeout(f, ms); };
+    whileVisible(el, () => { if (!running) { running = true; cycle(later); } },
+      () => { running = false; clearTimeout(timer); reset(); });
+  };
 
+  // ---- 안녕하세요 typed one key at a time, as Hangul composes on a phone keyboard
   const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
   const JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ';
   const JONG = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
-  const WORD = ['ㅇ', 'ㅏ', 'ㄴ', 'ㄴ', 'ㅕ', 'ㅇ', 'ㅎ', 'ㅏ', 'ㅅ', 'ㅔ', 'ㅇ', 'ㅛ'];   // 안녕하세요
-  const KEY = 210, BEFORE_SEND = 650, HOLD = 2600, REST = 700;
-
-  // every state of the word as it is typed: [finished text, syllable still composing]
-  const frames = [['', '']];
-  let done = '', cho = '', jung = '', jong = '';
-  const composing = () => (cho && jung
-    ? String.fromCharCode(0xac00 + (CHO.indexOf(cho) * 21 + JUNG.indexOf(jung)) * 28 + JONG.indexOf(jong))
-    : cho || jung);
-  const commit = () => { done += composing(); cho = jung = jong = ''; };
-  for (const j of WORD) {
-    if (CHO.includes(j)) {
-      if (!cho && !jung) cho = j;
-      else if (cho && jung && !jong && JONG.includes(j)) jong = j;
-      else { commit(); cho = j; }
-    } else if (jong) { const carry = jong; jong = ''; commit(); cho = carry; jung = j; }   // the final consonant starts the next syllable
-    else jung = j;
-    frames.push([done, composing()]);
+  const WORD = ['ㅇ', 'ㅏ', 'ㄴ', 'ㄴ', 'ㅕ', 'ㅇ', 'ㅎ', 'ㅏ', 'ㅅ', 'ㅔ', 'ㅇ', 'ㅛ'];
+  const frames = [['', '']];          // [finished text, syllable still composing] after each key
+  {
+    let done = '', cho = '', jung = '', jong = '';
+    const composing = () => (cho && jung
+      ? String.fromCharCode(0xac00 + (CHO.indexOf(cho) * 21 + JUNG.indexOf(jung)) * 28 + JONG.indexOf(jong))
+      : cho || jung);
+    const commit = () => { done += composing(); cho = jung = jong = ''; };
+    for (const j of WORD) {
+      if (CHO.includes(j)) {
+        if (!cho && !jung) cho = j;
+        else if (cho && jung && !jong && JONG.includes(j)) jong = j;
+        else { commit(); cho = j; }
+      } else if (jong) { const carry = jong; jong = ''; commit(); cho = carry; jung = j; }   // the final consonant starts the next syllable
+      else jung = j;
+      frames.push([done, composing()]);
+    }
   }
   const last = frames.length - 1;
-
-  const panel = (mode) => root.querySelector(`[data-mode="${mode}"]`);
+  const WHOLE = frames[last].join('');
   const show = (el, [d, c]) => { el.querySelector('.done').textContent = d; el.querySelector('.comp').textContent = c; };
-  const send = panel('send'), live = panel('live'), sendKey = root.querySelector('[data-send]');
-  const sendScreen = send.querySelector('[data-screen]');
+  const KEY = 210;
 
-  function frame(i) {
-    show(send.querySelector('[data-phone]'), frames[i]);
-    show(live.querySelector('[data-phone]'), frames[i]);
-    show(live.querySelector('[data-screen]'), frames[i]);
-  }
-  const whole = () => [frames[last][0] + frames[last][1], ''];
-
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    frame(last); show(sendScreen, whole());
-    return;
-  }
-
-  let timer = 0, running = false;
-  const later = (f, ms) => { timer = setTimeout(f, ms); };
-  function cycle() {
-    show(sendScreen, ['', '']);
-    let i = 0;
-    const step = () => {
-      frame(i);
-      if (i++ < last) return later(step, KEY);
-      later(() => {
-        sendKey.classList.add('is-down');
-        show(sendScreen, whole());
-        later(() => {
-          sendKey.classList.remove('is-down');
-          later(() => { frame(0); show(sendScreen, ['', '']); later(cycle, REST); }, HOLD);
-        }, 260);
-      }, BEFORE_SEND);
-    };
-    step();
+  // ---- realtime: the left screen gets the word only on 전송, the right one composes along with every key
+  {
+    const root = document.querySelector('[data-versus]');
+    if (root) {
+      const send = root.querySelector('[data-mode="send"]'), live = root.querySelector('[data-mode="live"]');
+      const sendKey = root.querySelector('[data-send]'), sendScreen = send.querySelector('[data-screen]');
+      const frame = (i) => {
+        show(send.querySelector('[data-phone]'), frames[i]);
+        show(live.querySelector('[data-phone]'), frames[i]);
+        show(live.querySelector('[data-screen]'), frames[i]);
+      };
+      const reset = () => { frame(0); show(sendScreen, ['', '']); sendKey.classList.remove('is-down'); };
+      if (reduced) { frame(last); show(sendScreen, [WHOLE, '']); }
+      else loop(root, function cycle(later) {
+        reset();
+        let i = 0;
+        const step = () => {
+          frame(i);
+          if (i++ < last) return later(step, KEY);
+          later(() => {
+            sendKey.classList.add('is-down');
+            show(sendScreen, [WHOLE, '']);
+            later(() => { sendKey.classList.remove('is-down'); later(() => { reset(); later(() => cycle(later), 700); }, 2600); }, 260);
+          }, 650);
+        };
+        step();
+      }, reset);
+    }
   }
 
-  // run only while the comparison is on screen, from the start each time it comes into view
-  const start = () => { if (!running) { running = true; cycle(); } };
-  const stop = () => { running = false; clearTimeout(timer); frame(0); show(sendScreen, ['', '']); sendKey.classList.remove('is-down'); };
-  if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => (e.isIntersecting ? start() : stop()), { threshold: 0.4 }).observe(root);
-  else start();
-})();
+  // ---- keyboards: an unfamiliar one the app imposes vs the user's own, typing in a few different looks
+  {
+    const root = document.querySelector('[data-keyboards]');
+    if (root) {
+      const MIC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>';
+      const LAYOUTS = {
+        plain: [[...'ㄱㄴㄷㄹㅁㅂㅅ'], [...'ㅇㅈㅊㅋㅌㅍㅎ'], [...'ㅏㅑㅓㅕㅗㅛㅜ'], ['ㅠ', 'ㅡ', 'ㅣ', '⌫', '↵']],
+        mine: [[...'ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ'], [...'ㅁㄴㅇㄹㅎㅗㅓㅏㅣ'], ['⇧', ...'ㅋㅌㅊㅍㅠㅜㅡ', '⌫'], ['!#1', 'mic', ' ', '.', '↵']],
+      };
+      for (const kb of root.querySelectorAll('[data-kb]')) {
+        kb.innerHTML = LAYOUTS[kb.dataset.kb].map((row, r) => `<div class="kb-row${kb.dataset.kb === 'mine' && r === 1 ? ' kb-row--inset' : ''}">${
+          row.map((k) => (k === 'mic' ? `<span class="fn">${MIC}</span>` : k === ' ' ? '<span class="space"></span>'
+            : `<span${/^[ㄱ-ㅣ]$/.test(k) ? '' : ' class="fn"'}>${k}</span>`)).join('')}</div>`).join('');
+      }
+      const card = root.querySelector('[data-skin]'), field = card.querySelector('.kb-field');
+      const keys = [...card.querySelectorAll('.kb-row span')];
+      const tips = [...card.querySelectorAll('.kb-suggest span')];
+      const SKINS = ['light', 'dark', 'mint'];
+      let skin = 0;
+      const frame = (i) => {
+        show(field, frames[i]);
+        const text = frames[i].join('');
+        ['안녕하세요', '안녕', '안녕히'].forEach((t, n) => { tips[n].textContent = text.startsWith('안녕') ? t : ''; });
+      };
+      const reset = () => { frame(0); keys.forEach((k) => k.classList.remove('is-down')); };
+      if (reduced) frame(last);
+      else loop(root, function cycle(later) {
+        reset();
+        let i = 0;
+        const step = () => {                          // press a key and show what it typed
+          if (i >= last) return later(() => { skin = (skin + 1) % SKINS.length; card.dataset.skin = SKINS[skin]; later(() => cycle(later), 500); }, 1800);
+          const key = keys.find((k) => k.textContent === WORD[i]);
+          key.classList.add('is-down');
+          setTimeout(() => key.classList.remove('is-down'), 140);
+          frame(++i);
+          later(step, KEY + 40);
+        };
+        later(step, 400);
+      }, reset);
+    }
+  }
 
-// The intro reel plays muted on its own; it stays still for people who ask for reduced motion.
-(() => {
-  const video = document.querySelector('.hero-video video');
-  if (video && matchMedia('(prefers-reduced-motion: reduce)').matches) { video.removeAttribute('autoplay'); video.pause(); }
-})();
+  // ---- calibration: press the button, pick what showed up, done
+  {
+    const cal = document.querySelector('[data-calibration] .cal');
+    if (cal) {
+      const STEPS = [900, 300, 1200, 800, 2200];      // start, pressed, question, answer picked, finished
+      const reset = () => { cal.dataset.step = '0'; };
+      if (reduced) cal.dataset.step = '4';
+      else loop(cal, function cycle(later) {
+        let n = 0;
+        const step = () => { cal.dataset.step = String(n); later(n === STEPS.length - 1 ? () => cycle(later) : step, STEPS[n++]); };
+        step();
+      }, reset);
+    }
+  }
 
-// Phones: a download bar stays at the bottom while neither the hero nor the closing badge is on screen.
-(() => {
-  const bar = document.querySelector('[data-sticky]');
-  const badges = [document.querySelector('.hero'), document.querySelector('.closing')].filter(Boolean);
-  if (!bar || !badges.length || !('IntersectionObserver' in window)) return;
-  const onScreen = new Set();
-  const watch = new IntersectionObserver((entries) => {
-    entries.forEach((e) => (e.isIntersecting ? onScreen.add(e.target) : onScreen.delete(e.target)));
-    bar.hidden = onScreen.size > 0;
-  });
-  badges.forEach((el) => watch.observe(el));
+  // ---- the intro reel plays muted on its own (still for reduced motion); one tap on the video or 소리 turns the sound on and off
+  {
+    const video = document.querySelector('.hero-video video');
+    const button = document.querySelector('[data-sound]');
+    if (video) {
+      if (reduced) { video.removeAttribute('autoplay'); video.pause(); }
+      if (button) {
+        const label = button.querySelector('[data-sound-label]');
+        const toggle = () => {
+          video.muted = !video.muted;
+          if (!video.muted && video.paused) video.play();
+          button.setAttribute('aria-pressed', String(!video.muted));
+          label.textContent = video.muted ? '소리 꺼짐' : '소리 켜짐';
+        };
+        button.addEventListener('click', toggle);
+        video.addEventListener('click', toggle);
+      }
+    }
+  }
+
+  // ---- phones: a download bar stays at the bottom while neither the hero nor the closing badge is on screen
+  {
+    const bar = document.querySelector('[data-sticky]');
+    const badges = [document.querySelector('.hero'), document.querySelector('.closing')].filter(Boolean);
+    if (bar && badges.length && 'IntersectionObserver' in window) {
+      const onScreen = new Set();
+      const watch = new IntersectionObserver((entries) => {
+        entries.forEach((e) => (e.isIntersecting ? onScreen.add(e.target) : onScreen.delete(e.target)));
+        bar.hidden = onScreen.size > 0;
+      });
+      badges.forEach((el) => watch.observe(el));
+    }
+  }
 })();
