@@ -6,7 +6,7 @@
 
 휴대폰을 블루투스 키보드와 마우스로 연결해, 평소 쓰던 휴대폰 키보드로 컴퓨터·태블릿·TV에 한글을 실시간 입력하고 터치패드·에어 마우스로 조작하는 Android 앱입니다.
 
-- 소개 페이지: https://minifinity-app.github.io/keyboard/
+- 소개 페이지: https://minifinity-app.github.io/
 - Google Play: https://play.google.com/store/apps/details?id=com.monontiq.koreanbluetoothkeyboard
 - 개인정보 처리방침: https://minifinity-app.github.io/bluetooth-hid-privacy-policy/
 

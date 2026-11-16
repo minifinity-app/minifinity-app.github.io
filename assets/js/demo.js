@@ -1,133 +1,81 @@
-// Hero demo: the phone keyboard on the page types on the "connected screen" above it, composing Hangul
-// one key at a time (ㅎ → 하 → 한) the way the app sends it. Keys can be tapped, clicked, or typed on a physical keyboard.
+// Side-by-side comparison under ㅎ → 하 → 한: both phones type the same word one key at a time.
+// The left screen only gets it when 전송 is pressed; the right screen composes along with every key, the way the app sends it.
 (() => {
-  const root = document.querySelector('[data-demo]');
+  const root = document.querySelector('[data-versus]');
   if (!root) return;
 
   const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
   const JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ';
   const JONG = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
-  const VOWEL_PAIR = { 'ㅗㅏ': 'ㅘ', 'ㅗㅐ': 'ㅙ', 'ㅗㅣ': 'ㅚ', 'ㅜㅓ': 'ㅝ', 'ㅜㅔ': 'ㅞ', 'ㅜㅣ': 'ㅟ', 'ㅡㅣ': 'ㅢ' };
-  const FINAL_PAIR = { 'ㄱㅅ': 'ㄳ', 'ㄴㅈ': 'ㄵ', 'ㄴㅎ': 'ㄶ', 'ㄹㄱ': 'ㄺ', 'ㄹㅁ': 'ㄻ', 'ㄹㅂ': 'ㄼ', 'ㄹㅅ': 'ㄽ', 'ㄹㅌ': 'ㄾ', 'ㄹㅍ': 'ㄿ', 'ㄹㅎ': 'ㅀ', 'ㅂㅅ': 'ㅄ' };
-  const unpair = (map, x) => Object.keys(map).find((k) => map[k] === x);
+  const WORD = ['ㅇ', 'ㅏ', 'ㄴ', 'ㄴ', 'ㅕ', 'ㅇ', 'ㅎ', 'ㅏ', 'ㅅ', 'ㅔ', 'ㅇ', 'ㅛ'];   // 안녕하세요
+  const KEY = 210, BEFORE_SEND = 650, HOLD = 2600, REST = 700;
 
-  // letter keys by row, in both layouts; physical keys map to the same positions
-  const KO = ['ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ', 'ㅁㄴㅇㄹㅎㅗㅓㅏㅣ', 'ㅋㅌㅊㅍㅠㅜㅡ'].join('');
-  const EN = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'].join('');
-  const KO_SHIFT = { 'ㅂ': 'ㅃ', 'ㅈ': 'ㅉ', 'ㄷ': 'ㄸ', 'ㄱ': 'ㄲ', 'ㅅ': 'ㅆ', 'ㅐ': 'ㅒ', 'ㅔ': 'ㅖ' };
-  const MAX = 36;
-
-  const letters = [...root.querySelectorAll('[data-i]')];
-  const fn = (name) => root.querySelector(`[data-fn="${name}"]`);
-  const outs = [...root.querySelectorAll('[data-out]')];
-  const field = root.querySelector('.p-field-text');
-
+  // every state of the word as it is typed: [finished text, syllable still composing]
+  const frames = [['', '']];
   let done = '', cho = '', jung = '', jong = '';
-  let korean = true, shift = false;
-
   const composing = () => (cho && jung
     ? String.fromCharCode(0xac00 + (CHO.indexOf(cho) * 21 + JUNG.indexOf(jung)) * 28 + JONG.indexOf(jong))
     : cho || jung);
   const commit = () => { done += composing(); cho = jung = jong = ''; };
-  const full = () => [...done].length + (composing() ? 1 : 0) >= MAX;
-
-  function typeJamo(j) {
+  for (const j of WORD) {
     if (CHO.includes(j)) {
       if (!cho && !jung) cho = j;
-      else if (!jung || !cho) { commit(); cho = j; }
-      else if (!jong && JONG.includes(j)) jong = j;
-      else if (jong && FINAL_PAIR[jong + j]) jong = FINAL_PAIR[jong + j];
+      else if (cho && jung && !jong && JONG.includes(j)) jong = j;
       else { commit(); cho = j; }
-    } else if (jong) {                       // the final consonant moves on to start the next syllable
-      const pair = unpair(FINAL_PAIR, jong), carry = pair ? pair[1] : jong;
-      jong = pair ? pair[0] : '';
-      commit(); cho = carry; jung = j;
-    } else if (jung) {
-      if (VOWEL_PAIR[jung + j]) jung = VOWEL_PAIR[jung + j];
-      else { commit(); jung = j; }
-    } else jung = j;
+    } else if (jong) { const carry = jong; jong = ''; commit(); cho = carry; jung = j; }   // the final consonant starts the next syllable
+    else jung = j;
+    frames.push([done, composing()]);
   }
-  function backspace() {
-    if (jong) { const p = unpair(FINAL_PAIR, jong); jong = p ? p[0] : ''; }
-    else if (jung) { const p = unpair(VOWEL_PAIR, jung); jung = p ? p[0] : ''; }
-    else if (cho) cho = '';
-    else done = [...done].slice(0, -1).join('');
+  const last = frames.length - 1;
+
+  const panel = (mode) => root.querySelector(`[data-mode="${mode}"]`);
+  const show = (el, [d, c]) => { el.querySelector('.done').textContent = d; el.querySelector('.comp').textContent = c; };
+  const send = panel('send'), live = panel('live'), sendKey = root.querySelector('[data-send]');
+  const sendScreen = send.querySelector('[data-screen]');
+
+  function frame(i) {
+    show(send.querySelector('[data-phone]'), frames[i]);
+    show(live.querySelector('[data-phone]'), frames[i]);
+    show(live.querySelector('[data-screen]'), frames[i]);
+  }
+  const whole = () => [frames[last][0] + frames[last][1], ''];
+
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    frame(last); show(sendScreen, whole());
+    return;
   }
 
-  function render() {
-    for (const out of outs) {
-      out.querySelector('.done').textContent = done;
-      out.querySelector('.comp').textContent = composing();
-    }
-    field.scrollLeft = field.scrollWidth;
-    letters.forEach((b, i) => {
-      const base = (korean ? KO : EN)[i];
-      b.textContent = korean ? (shift && KO_SHIFT[base]) || base : shift ? base.toUpperCase() : base;
-    });
-    fn('shift').setAttribute('aria-pressed', String(shift));
-    fn('lang').textContent = korean ? '한/영' : 'A/한';
-  }
-  function flash(button) {
-    button.classList.add('is-down');
-    setTimeout(() => button.classList.remove('is-down'), 130);
-  }
-
-  function press(button) {
-    const name = button.dataset.fn;
-    if (name === 'shift') shift = !shift;
-    else if (name === 'lang') { commit(); korean = !korean; shift = false; }
-    else if (name === 'bksp') backspace();
-    else if (name === 'clear') { done = cho = jung = jong = ''; }
-    else if (!full() || (korean && !name && composing())) {
-      if (name === 'space') { commit(); done += ' '; }
-      else if (name === 'dot') { commit(); done += '.'; }
-      else if (korean) typeJamo(button.textContent);
-      else { commit(); done += button.textContent; }
-      shift = false;
-    }
-    if (name !== 'clear') flash(button);
-    render();
+  let timer = 0, running = false;
+  const later = (f, ms) => { timer = setTimeout(f, ms); };
+  function cycle() {
+    show(sendScreen, ['', '']);
+    let i = 0;
+    const step = () => {
+      frame(i);
+      if (i++ < last) return later(step, KEY);
+      later(() => {
+        sendKey.classList.add('is-down');
+        show(sendScreen, whole());
+        later(() => {
+          sendKey.classList.remove('is-down');
+          later(() => { frame(0); show(sendScreen, ['', '']); later(cycle, REST); }, HOLD);
+        }, 260);
+      }, BEFORE_SEND);
+    };
+    step();
   }
 
-  // ---- the opening run: 한글 bluetooth 키보드, with a 한/영 switch each way
-  const SCRIPT = ['ㅎ', 'ㅏ', 'ㄴ', 'ㄱ', 'ㅡ', 'ㄹ', 'space', 'lang', 'b', 'l', 'u', 'e', 't', 'o', 'o', 't', 'h', 'space', 'lang', 'ㅋ', 'ㅣ', 'ㅂ', 'ㅗ', 'ㄷ', 'ㅡ'];
-  let timer = 0, step = 0;
-  const find = (token) => fn(token) || letters.find((b) => b.textContent === token);
-  function run() {
-    if (step >= SCRIPT.length) { timer = 0; return; }
-    const token = SCRIPT[step++];
-    press(find(token));
-    timer = setTimeout(run, token === 'lang' || token === 'space' ? 380 : 170);
-  }
-  function stopRun() { if (timer) { clearTimeout(timer); timer = 0; } step = SCRIPT.length; }
+  // run only while the comparison is on screen, from the start each time it comes into view
+  const start = () => { if (!running) { running = true; cycle(); } };
+  const stop = () => { running = false; clearTimeout(timer); frame(0); show(sendScreen, ['', '']); sendKey.classList.remove('is-down'); };
+  if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => (e.isIntersecting ? start() : stop()), { threshold: 0.4 }).observe(root);
+  else start();
+})();
 
-  root.addEventListener('click', (e) => {
-    const button = e.target.closest('button');
-    if (!button || !root.contains(button)) return;
-    stopRun();
-    press(button);
-  });
-  root.addEventListener('keydown', (e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const onButton = e.target.closest('button');
-    if (onButton && (e.code === 'Space' || e.code === 'Enter')) return;      // let the focused key activate itself
-    let button = null;
-    if (/^Key[A-Z]$/.test(e.code)) {
-      button = letters[EN.indexOf(e.code[3].toLowerCase())];
-      if (e.shiftKey !== shift) { shift = e.shiftKey; render(); }
-    } else if (e.code === 'Space') button = fn('space');
-    else if (e.code === 'Backspace') button = fn('bksp');
-    else if (e.code === 'Period') button = fn('dot');
-    else if (e.code === 'Lang1' || e.key === 'HangulMode') button = fn('lang');
-    if (!button) return;
-    e.preventDefault();
-    stopRun();
-    press(button);
-  });
-
-  render();
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { done = '한글 bluetooth 키보드'; step = SCRIPT.length; render(); }
-  else timer = setTimeout(run, 900);
+// The intro reel plays muted on its own; it stays still for people who ask for reduced motion.
+(() => {
+  const video = document.querySelector('.hero-video video');
+  if (video && matchMedia('(prefers-reduced-motion: reduce)').matches) { video.removeAttribute('autoplay'); video.pause(); }
 })();
 
 // Phones: a download bar stays at the bottom while neither the hero nor the closing badge is on screen.
